@@ -7,8 +7,8 @@ from bs4 import BeautifulSoup
 import time
 import json
 
-from contest_title import contest_title
-from prior_art import prior_art
+from extract_contest_title import contest_title
+from extract_prior_art import prior_art
 
 # Set up headless Chrome for main navigation
 options = Options()
