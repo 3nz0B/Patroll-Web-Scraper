@@ -75,4 +75,4 @@ def prior_art(contestlink,driver):
 
 
     
-prior_art("https://patroll.unifiedpatents.com/contests/d4wk2MggiYTwqh4Qq",driver)
+prior_art("https://patroll.unifiedpatents.com/contests/d4wk2MggiYTwqh4Qq",webdriver)
