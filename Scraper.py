@@ -5,11 +5,15 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-import openpyxl
-from openpyxl.utils import get_column_letter
 import json
+import os
 
 def main_scraper():
+    """
+    Scrape contest listings and their details from patroll.unifiedpatents.com,
+    collecting contest titles, troll patent IDs, and prior art patents, then save
+    all results to a JSON file.
+    """
     # Set up headless Chrome for main navigation
     options = Options()
     options.add_argument("--headless")
@@ -95,6 +99,9 @@ def main_scraper():
         print("\n✅ Data saved to 'scraped_patents.json'")
 
 def scrape_contest_title(contestlink,driver):
+    """
+    Extract the contest title from a given contest page URL using the provided Selenium driver.
+    """
     
     #use contest link to get the title of the contest
     #Here is an example of a link you would recieve as a function parameter: https://patroll.unifiedpatents.com/contests/mJ5QT4wkDCCjhy9xb
@@ -114,6 +121,9 @@ def scrape_contest_title(contestlink,driver):
     return title
 
 def scrape_prior_art_link(contestlink,driver):   
+    """
+    Locate and return the download link for the winning prior art PDF from a given contest page.
+    """
     try:
         driver.get(contestlink)
         
@@ -136,7 +146,10 @@ def scrape_prior_art_link(contestlink,driver):
         print("Done")
 
 def scrape_prior_art(contestlink,driver):
-    
+    """
+    Extract a list of prior art patent IDs from a given contest page by navigating to the
+    download link and parsing the resulting page.
+    """
     #use contest link to get the ID of the prior art
     #Here is an example of a link you would recieve as a function parameter: https://patroll.unifiedpatents.com/contests/mJ5QT4wkDCCjhy9xb
    
@@ -181,24 +194,22 @@ def scrape_prior_art(contestlink,driver):
     return '; '.join(prior_art_list)
 
 def scrape_contests():
+    """
+    Scrape contest listings (title, troll patent, prior art, award) 
+    from patroll.unifiedpatents.com and save results to scraped_patents.json.
+    """
 
-    # Load the Excel file
-    excel_path = "output.xlsx"
-    try:
-        workbook = openpyxl.load_workbook(excel_path)
-    except Exception as e:
-        print("Error loading Excel file:", e)
-        raise
+    # 🔑 JSON output file
+    json_file = "scraped_patents.json"
 
-    # Create a new sheet for the output if it doesn't exist
-    sheet_name = "Scraped Contests"
-    if sheet_name not in workbook.sheetnames:
-        ws = workbook.create_sheet(sheet_name)
-        ws.append(["Troll Patent", "Prior Art Patents", "Contest Title", "Award Amount", "Contest URL"])
+    # Load existing data if it exists
+    if os.path.exists(json_file):
+        with open(json_file, "r") as f:
+            scraped_data = json.load(f)
     else:
-        ws = workbook[sheet_name]
+        scraped_data = []
 
-    # Setup Selenium browser
+    # ✅ Setup headless browser
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--window-size=1920,1080")
@@ -208,12 +219,13 @@ def scrape_contests():
     main_url = f"{base_url}/contests?category=finished"
     driver.get(main_url)
 
-    max_pages = 2  # Adjust if you want more contests
+    max_pages = 19
+
     try:
         for page in range(1, max_pages + 1):
             print(f"Processing contest listings page {page}...")
 
-            time.sleep(2)
+            time.sleep(2)  # simple wait
             soup = BeautifulSoup(driver.page_source, "html.parser")
             contest_links = soup.select("ul.ant-list-items a[href^='/contests/']")
             contest_urls = list(set([base_url + a['href'] for a in contest_links]))
@@ -225,7 +237,7 @@ def scrape_contests():
 
                 soup = BeautifulSoup(driver.page_source, "html.parser")
 
-                # Contest Title
+                # Title
                 title_elem = soup.find("h1")
                 title = title_elem.text.strip() if title_elem else "N/A"
 
@@ -245,14 +257,22 @@ def scrape_contests():
                 for a in all_links:
                     href = a["href"]
                     if href.startswith("https://www.google.com/patents"):
-                        prior_art.append(href.split("patents/")[-1])
+                        prior_art.append(href.split("patents/")[-1].strip())
 
-                prior_art_str = ", ".join(set(prior_art))
+                prior_art = list(set(prior_art))
 
-                # Add row to Excel
-                ws.append([troll_patent, prior_art_str, title, award_amount, contest_url])
+                # ✅ Add to list
+                contest_data = {
+                    "troll_patent": troll_patent,
+                    "prior_art": prior_art,
+                    "title": title,
+                    "award_amount": award_amount,
+                    "contest_url": contest_url
+                }
 
-            # Next Page
+                scraped_data.append(contest_data)
+
+            # Next page
             try:
                 next_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, f"//li[@title='{page + 1}']"))
@@ -265,7 +285,12 @@ def scrape_contests():
 
     finally:
         driver.quit()
-        workbook.save(excel_path)
-        print(f"\n✅ Data saved directly to '{sheet_name}' in Excel file.")
+        # ✅ Save all contests to JSON
+        with open(json_file, "w") as f:
+            json.dump(scraped_data, f, indent=2)
+        print(f"\n✅ Data saved to '{json_file}'. Total contests: {len(scraped_data)}")
 
 main_scraper()
+scrape_contests()
+
+
